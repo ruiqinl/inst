@@ -13,11 +13,11 @@
                     if (response.data && response.data.length > 0) {
                         $scope.result = response.data;
                     } else {
-                        $scope.error = {description: 'No Image or Video Found'};
+                        $scope.error = {message: 'No Image or Video Found'};
                     }
                 })
                 .catch(function(error){
-                    //console.log('error:', JSON.stringify(error));
+                    console.log('error:', JSON.stringify(error));
                     $scope.error = error.data;
                 })
                 .finally(function(){
