@@ -1,0 +1,9 @@
+<div ng-if="media.videoSrc" class="media media-video">
+    <video controls ng-src="{{media.videoSrc}}" class="img-responsive" ng-click="play($event)">
+        <p>Your browser doesn't support HTML 5</p>
+    </video>
+</div>
+<div ng-if="!media.videoSrc" class="media media-image">
+    <img ng-src="{{media.displaySrc}}" class="img-responsive"
+         ng-click="openInNewTab(media.displaySrc)"/>
+</div>
