@@ -1,7 +1,7 @@
 package com.rli.inst.parser;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.google.common.base.Optional;
+import java.util.Optional;
 import com.google.common.collect.Lists;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -73,7 +73,7 @@ public class SinglePageMediaExtractor implements MediaExtractor {
             return Optional.of(new MediaSrc(id, null, displayUrl, videoUrl, isVideo));
         } catch (MalformedURLException e) {
             logger.error("Invalid URL found in fetched data: {}", mediaNode);
-            return Optional.absent();
+            return Optional.empty();
         }
     }
 }
