@@ -1,6 +1,7 @@
 package com.rli.inst.parser;
 
 import com.fasterxml.jackson.databind.JsonNode;
+
 import java.util.Optional;
 import com.google.common.collect.Lists;
 import org.slf4j.Logger;
@@ -10,33 +11,26 @@ import org.springframework.stereotype.Service;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.List;
+import java.util.stream.Collectors;
 
 
 @Service("singlePageMediaExtractor")
 public class SinglePageMediaExtractor implements MediaExtractor {
     private final Logger logger = LoggerFactory.getLogger(this.getClass());
-    private final String singleMediaPath = "entry_data.PostPage[0].graphql.shortcode_media";
-    private final String multipleMediaPath = singleMediaPath + ".edge_sidecar_to_children.edges";
 
     @Override
     public List<MediaSrc> extract(JsonNode jsonNode) {
-        Optional<JsonNode> multipleMedia = JsonNodeWrapper.of(jsonNode).get(multipleMediaPath);
-        if (multipleMedia.isPresent()) {
-            List<MediaSrc> list = getMultipleMediaSrc(multipleMedia.get());
-            if (!list.isEmpty()) {
-                return list;
-            }
-        }
+        JsonNode singleMediaNode = jsonNode.findPath("shortcode_media");
+        JsonNode multiMediasNode = singleMediaNode.findPath("edge_sidecar_to_children").findPath("edges");
 
-        Optional<JsonNode> singleMedia = JsonNodeWrapper.of(jsonNode).get(singleMediaPath);
-        if (singleMedia.isPresent()) {
-            Optional<MediaSrc> mediaSrc = getSingleMediaSrc(singleMedia.get());
+        if (!multiMediasNode.isMissingNode()) {
+            return getMultipleMediaSrc(multiMediasNode);
+        } else if (!singleMediaNode.isMissingNode()) {
+            Optional<MediaSrc> mediaSrc = getSingleMediaSrc(singleMediaNode);
             if (mediaSrc.isPresent()) {
                 return Lists.newArrayList(mediaSrc.get());
             }
         }
-
-        logger.warn("Found no Media in {}", jsonNode);
         return Lists.newArrayList();
     }
 
@@ -47,32 +41,23 @@ public class SinglePageMediaExtractor implements MediaExtractor {
     }
 
     private List<MediaSrc> getMultipleMediaSrc(JsonNode multipleMedia) {
-        List<MediaSrc> list = Lists.newArrayList();
-        for (JsonNode edge : multipleMedia) {
-            JsonNode node = edge.get("node");
-            if (node == null) continue;
-
-            Optional<MediaSrc> mediaSrc = getSingleMediaSrc(node);
-            if (mediaSrc.isPresent()) {
-                list.add(mediaSrc.get());
-            }
-        }
-        return list;
+        return multipleMedia.findValues("node")
+                .stream()
+                .map(n -> getSingleMediaSrc(n).orElse(null))
+                .filter(m -> m != null)
+                .collect(Collectors.toList());
     }
 
-    private Optional<MediaSrc> getSingleMediaSrc(JsonNode mediaNode) {
-        final String id = mediaNode.get("id").asText();
-        final String displayUrl = mediaNode.get("display_url").asText();
-        final boolean isVideo = mediaNode.get("is_video").asBoolean();
-        String videoUrl = null;
-        if (isVideo) {
-            videoUrl = mediaNode.get("video_url").asText();
-        }
+    private Optional<MediaSrc> getSingleMediaSrc(JsonNode node) {
+        final String id = node.path("id").asText();
+        final String displayUrl = node.path("display_url").asText();
+        final boolean isVideo = node.path("is_video").asBoolean();
+        final String videoUrl = node.path("video_url").asText();
 
         try {
             return Optional.of(new MediaSrc(id, null, displayUrl, videoUrl, isVideo));
         } catch (MalformedURLException e) {
-            logger.error("Invalid URL found in fetched data: {}", mediaNode);
+            logger.warn("Invalid URL found in fetched data: {}", node, e);
             return Optional.empty();
         }
     }

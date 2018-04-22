@@ -1,49 +1,29 @@
 package com.rli.inst.parser;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.google.common.collect.Lists;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service("homepageMediaExtractor")
 public class HomepageMediaExtractor implements MediaExtractor {
     private final Logger logger = LoggerFactory.getLogger(this.getClass());
 
-    private final String path = "entry_data.ProfilePage[0].graphql.user.edge_owner_to_timeline_media.edges";
-
     @Override
     public List<MediaSrc> extract(final JsonNode jsonNode) {
+        JsonNode mediaNodesRoot = jsonNode.findPath("edge_owner_to_timeline_media").findPath("edges");
 
-        Optional<JsonNode> nodes = JsonNodeWrapper.of(jsonNode).get(path);
-        if (!nodes.isPresent()) {
-            return Lists.newArrayList();
-        }
-
-        List<MediaSrc> mediaSrcs = Lists.newArrayList();
-        Iterator<JsonNode> ite = nodes.get().elements();
-        while (ite.hasNext()) {
-            JsonNode node = ite.next().get("node");
-
-            final String id = node.get("id").asText();
-            final String thumbnailSrc = node.get("thumbnail_src").asText();
-            final String displaySrc = node.get("display_url").asText();
-            final boolean isVideo = node.get("is_video").asBoolean();
-
-            try {
-                mediaSrcs.add(new MediaSrc(id, thumbnailSrc, displaySrc, null, isVideo));
-            } catch (MalformedURLException e) {
-                logger.error("Invalid URL found in fetched data: {}", node, e);
-            }
-        }
-
-        return mediaSrcs;
+        return mediaNodesRoot.findValues("node")
+                .stream()
+                .map(n -> getSingleMediaSrc(n).orElse(null))
+                .filter(m -> m != null)
+                .collect(Collectors.toList());
     }
 
     @Override
@@ -52,5 +32,19 @@ public class HomepageMediaExtractor implements MediaExtractor {
         return path.matches("/[^/]+/?");
     }
 
+    private Optional<MediaSrc> getSingleMediaSrc(JsonNode node) {
+        final String id = node.path("id").asText();
+        final String displayUrl = node.path("display_url").asText();
+        final boolean isVideo = node.path("is_video").asBoolean();
+        final String videoUrl = node.path("video_url").asText();
+        final String thumbnailSrc = node.path("thumbnail_src").asText();
+
+        try {
+            return Optional.of(new MediaSrc(id, thumbnailSrc, displayUrl, videoUrl, isVideo));
+        } catch (MalformedURLException e) {
+            logger.warn("Invalid URL found in fetched data: {}", node, e);
+            return Optional.empty();
+        }
+    }
 
 }
