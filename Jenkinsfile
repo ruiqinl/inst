@@ -30,9 +30,16 @@ pipeline {
         }
       }
     }
-    stage('Test') {
+    stage('Test-master') {
+      when {branch 'master'}
       steps {
-        echo 'test'
+        echo 'test master'
+      }
+    }
+    stage('Test-dev') {
+      when {branch 'dev'}
+      steps {
+        echo 'test dev'
       }
     }
   }
